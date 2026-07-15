@@ -1,0 +1,282 @@
+const db = require('../../config/db');
+
+const KamarModel = {
+
+    getAll: async (filters = {} ) => {
+        try {
+
+        
+        let query = `
+            SELECT 
+                k.id_kamar, k.nomor_kamar, k.id_tipe_kamar,  k.kapasitas, k.luas_kamar, 
+                k.harga_per_malam, k.harga_per_bulan, k.jumlah_deposit, 
+                k.status, k.is_active, k.deskripsi, k.notes,
+                t.nama AS tipe_kamar, 
+                
+                GROUP_CONCAT(DISTINCT f.path SEPARATOR '|') as foto_kamar,
+
+                GROUP_CONCAT(DISTINCT CONCAT(fk.id_fasilitas, ':', fk.nama, ':', fk.icon) SEPARATOR '|') as data_fasilitas
+
+            FROM kamar k
+            LEFT JOIN tipe_kamar t ON k.id_tipe_kamar = t.id_tipe_kamar
+            LEFT JOIN foto_kamar f ON k.id_kamar = f.id_kamar
+            LEFT JOIN kamar_fasilitas_kamar as kfk ON k.id_kamar = kfk.id_kamar
+            LEFT JOIN fasilitas_kamar as fk ON kfk.id_fasilitas = fk.id_fasilitas
+            WHERE 1=1`;
+
+        const params = [];
+
+        if(filters.search) {
+            query += ' AND (k.nomor_kamar LIKE ? or t.nama LIKE ?)';
+
+            params.push(`%${filters.search}%`);
+            params.push(`%${filters.search}%`);
+        }
+        if (filters.status) {
+            query += ' AND k.status = ? ';
+            params.push(filters.status);
+        }
+        if (filters.is_active !== undefined) {
+            query += ' AND k.is_active = ? ';
+            params.push(filters.is_active);
+        }
+
+        query += ' GROUP BY k.id_kamar ORDER BY k.nomor_kamar ASC';
+
+        const [rows] = await db.query(query, params);
+
+        const formattedData = rows.map(room => {
+            let listFasilitas = [];
+            let listFoto = [];
+
+            if(room.foto_kamar) {
+                const perFoto = room.foto_kamar.split('|');
+                listFoto = perFoto.map(pathRaw => {
+                    return {path: pathRaw};
+                });
+            }
+
+            if (room.data_fasilitas) {
+                const perFasilitas = room.data_fasilitas.split('|');
+                listFasilitas = perFasilitas.map(item => {
+                    const [id_fasilitas, nama, icon] = item.split(':');
+                    return { 
+                        id_fasilitas: Number(id_fasilitas), 
+                        nama: nama, 
+                        icon: icon 
+                    };
+                });
+            }
+
+            // Hapus properti data_fasilitas yang berwujud string mentah agar rapi
+            delete room.foto_kamar;
+            delete room.data_fasilitas; 
+
+            return {
+                ...room,
+                fasilitas: listFasilitas, // Hierarki disisipkan ke sini
+                foto: listFoto
+            };
+        });
+
+        return formattedData;
+        } catch ( error ) {
+            console.error('KamarModel getAll error:', error);
+            throw error;
+        } 
+    },
+
+    getById: async (id_kamar) => {
+        const [[kamar]] = await db.query(`
+            SELECT k.*,
+            t.nama AS tipe_kamar
+            FROM kamar k
+            LEFT JOIN tipe_kamar t ON k.id_tipe_kamar = t.id_tipe_kamar
+            WHERE k.id_kamar = ?`, [id_kamar]);
+
+        if (!kamar) return null;
+
+        const [fasilitas] = await db.query(`
+            SELECT f.id, f.nama, f.deskripsi
+            FROM fasilitas_kamar f
+            INNER JOIN kamar_fasilitas_kamar kf ON f.id_foto = kf.id_fasilitas_kamar
+            WHERE kf.id_kamar = ?`, [id_kamar]);
+
+        const [foto] = await db.query(`
+            SELECT id_foto, path, sort_order, is_primary
+            FROM foto_kamar
+            WHERE id_kamar = ?
+            ORDER BY is_primary DESC, sort_order ASC`, [id_kamar]);
+
+        return {
+            ...kamar,
+            fasilitas,
+            foto
+        };
+
+    },
+
+
+    get:async () => {
+        const [rows] = await db.query('SELECT * FROM kamar');
+        return rows;
+    },
+
+
+    create: async(data) => {
+        const connection = await db.getConnection();
+
+        try{
+            await connection.beginTransaction();
+
+            const {
+            nomor_kamar, id_tipe_kamar, kapasitas, luas_kamar,
+            harga_per_malam, harga_per_bulan, jumlah_deposit, 
+            status = 'empty', is_active = 1, deskripsi, notes, 
+            fasilitas
+            } = data;
+
+            const [result] = await connection.query (`
+                INSERT INTO kamar (
+                    nomor_kamar, id_tipe_kamar, kapasitas, luas_kamar,
+                    harga_per_malam, harga_per_bulan, jumlah_deposit,
+                    status, is_active, deskripsi, notes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
+            [
+                nomor_kamar, id_tipe_kamar, kapasitas, luas_kamar ?? null,
+                harga_per_malam ?? null, harga_per_bulan ?? null, jumlah_deposit ?? null,
+                status, is_active, deskripsi ?? null, notes ?? null, 
+            ]);
+
+            const newKamarId = result.insertId;
+
+            if (fasilitas && fasilitas.length > 0) {
+                const junctionValues = fasilitas.map(id_fasilitas => [newKamarId, id_fasilitas]);
+
+                // Sesuaikan nama tabel junction sesuai ERD kamu
+                const queryJunction = `INSERT INTO kamar_fasilitas_kamar (id_kamar, id_fasilitas) VALUES ?`;
+                
+                await connection.query(queryJunction, [junctionValues]);
+            }
+
+            await connection.commit();
+
+            return result;
+        } catch (error) {
+            await connection.rollback();
+            console.error('KamarModel create error:', error);
+            throw error;
+        }
+        
+    },
+
+
+    update: async (id_kamar, data) => {
+        const connection = await db.getConnetction();
+        try{
+
+            await connection.beginTransaction();
+        
+            const {
+                nomor_kamar, id_tipe_kamar, kapasitas, luas_kamar,
+                harga_per_malam, harga_per_bulan, jumlah_deposit,
+                status, is_active, deskripsi, notes,
+                fasilitas
+            } = data;
+
+            const [result] = await connection.query(
+                `UPDATE kamar SET
+                    nomor_kamar = ?, id_tipe_kamar = ?, kapasitas = ?, luas_kamar =?,
+                    harga_per_malam = ?, harga_per_bulan = ?, jumlah_deposit = ?, 
+                    status = ?, is_active = ?, deskripsi = ?, notes = ?, updated_at = NOW()
+                WHERE id_kamar = ?`,
+                [
+                    nomor_kamar, id_tipe_kamar, kapasitas, luas_kamar,
+                    harga_per_malam ?? null, harga_per_bulan ?? null, jumlah_deposit ?? null,
+                    status, is_active, deskripsi ?? null, notes ?? null, id_kamar
+                ]);
+
+                await connection.query('DELETE FROM kamar_fasilitas_kamar WHERE id_kamar = ?', [id_kamar])
+                
+                if (fasilitas && fasilitas.length > 0) {
+                    const junctionValues = fasilitas.map(id_fasilitas => [id_kamar, id_fasilitas]);
+                    const queryJunction = `INSERT INTO kamar_fasilitas_kamar (id_kamar, id_fasilitas) WHERE VALUES ?`;
+
+                    await connection.query(queryJunction, [junctionValues]);
+                }
+
+                await connection.commit();
+                return result;
+        } catch (error) {
+            await connection.rollback();
+            console.error('KamarModel update error:', error);
+            throw error;
+        } finally {
+            connection.release();
+        }
+    },
+
+
+    updateStatus: async (id_kamar, status) => {
+        try{
+            const VALID_STATUS = ['available', 'reserved', 'occupied', 'empty', 'cleaning', 'maintenance'];
+            if (!VALID_STATUS.includes(status)) throw new Error('Status tidak valid: ${status}');
+
+            const result = await db.query(
+                `UPDATE kamar SET status = ?, updated_at = NOW() WHERE id_kamar = ?`,
+                [status, id_kamar]
+            );
+            return result;
+        }catch(error){
+            console.error('UpdateStatusKamar error: ', error);
+            throw error;
+        }
+        
+    },
+
+    activate: async (id_kamar) => {
+        const result = await db.query(
+            'UPDATE kamar SET is_active = 1 WHERE id_kamar = ?',
+            [id_kamar]
+        );
+        return result;
+    },
+
+
+    deactivate: async (id_kamar) => {
+        const [[kamar]] = await db.query('SELECT * FROM kamar WHERE id_kamar = ?', [id_kamar]);
+        if (!kamar) {
+            throw new Error('Kamar Tidak Ditemukan');
+        }
+
+        const BLOCKED_STATUS = ['reserved', 'occupied'];
+
+        if(BLOCKED_STATUS.includes(kamar.status)) {
+            throw new Error(`Kamar Tidak Dapat Dinonaktifkan dengan Status "${kamar.status}"`);
+        }
+
+        const result = await db.query(
+            'UPDATE kamar SET is_active = 0 WHERE id_kamar = ?',
+            [id_kamar]
+        );
+        return result;
+    },
+    
+    delete: async (id_kamar) => {
+        const [[kamar]] = await db.query('SELECT * FROM kamar WHERE id_kamar = ?',
+            [id_kamar]
+        );
+
+        if (!kamar) {
+            throw new Error('Kamar Tidak Ditemukan');
+        }
+
+        const BLOCKED_STATUS = ['reserved', 'occupied', 'maintenance', 'cleaning'];
+
+        if(BLOCKED_STATUS.includes(kamar.status)){
+            throw new Error(`Kamar Tidak Dapat Dihapus dengan Status "${kamar.status}"`);
+        }
+    }
+};
+
+module.exports = KamarModel;
