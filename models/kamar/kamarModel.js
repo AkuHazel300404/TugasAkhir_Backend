@@ -27,8 +27,19 @@ const KamarModel = {
         const params = [];
 
         if(filters.search) {
-            query += ' AND (k.nomor_kamar LIKE ? or t.nama LIKE ?)';
+            query += ` AND (
+                k.nomor_kamar LIKE ? OR 
+                t.nama LIKE ? OR 
+                EXISTS (
+                    SELECT 1 
+                    FROM kamar_fasilitas_kamar kfk_sub
+                    JOIN fasilitas_kamar fk_sub ON kfk_sub.id_fasilitas = fk_sub.id_fasilitas
+                    WHERE kfk_sub.id_kamar = k.id_kamar 
+                    AND fk_sub.nama LIKE ?
+                )
+            )`;
 
+            params.push(`%${filters.search}%`);
             params.push(`%${filters.search}%`);
             params.push(`%${filters.search}%`);
         }
@@ -87,33 +98,41 @@ const KamarModel = {
     },
 
     getById: async (id_kamar) => {
-        const [[kamar]] = await db.query(`
+        try {
+            const [[kamar]] = await db.query(`
             SELECT k.*,
-            t.nama AS tipe_kamar
+                t.nama AS tipe_kamar
             FROM kamar k
             LEFT JOIN tipe_kamar t ON k.id_tipe_kamar = t.id_tipe_kamar
             WHERE k.id_kamar = ?`, [id_kamar]);
 
-        if (!kamar) return null;
+            if (!kamar) return null;
 
-        const [fasilitas] = await db.query(`
-            SELECT f.id, f.nama, f.deskripsi
-            FROM fasilitas_kamar f
-            INNER JOIN kamar_fasilitas_kamar kf ON f.id_foto = kf.id_fasilitas_kamar
-            WHERE kf.id_kamar = ?`, [id_kamar]);
+            // 2. Ambil Fasilitas Kamar (PERBAIKAN: ON kf.id_fasilitas_kamar & SERTAKAN icon)
+            const [fasilitas] = await db.query(`
+                SELECT f.id_fasilitas, f.nama, f.icon
+                FROM fasilitas_kamar f
+                INNER JOIN kamar_fasilitas_kamar kf ON f.id_fasilitas = kf.id_fasilitas
+                WHERE kf.id_kamar = ?`, [id_kamar]);
 
-        const [foto] = await db.query(`
-            SELECT id_foto, path, sort_order, is_primary
-            FROM foto_kamar
-            WHERE id_kamar = ?
-            ORDER BY is_primary DESC, sort_order ASC`, [id_kamar]);
+            // 3. Ambil Foto Kamar
+            const [foto] = await db.query(`
+                SELECT id_foto_kamar, path, sort_order, is_primary
+                FROM foto_kamar
+                WHERE id_kamar = ?
+                ORDER BY is_primary DESC, sort_order ASC`, [id_kamar]);
 
-        return {
-            ...kamar,
-            fasilitas,
-            foto
-        };
-
+            return {
+                ...kamar,
+                fasilitas,
+                foto
+            };
+        } catch (error) {
+            console.error('Get Kamar by Id error : ', error);
+            throw error
+        }
+        // 1. Ambil Data Kamar & Tipe
+        
     },
 
 

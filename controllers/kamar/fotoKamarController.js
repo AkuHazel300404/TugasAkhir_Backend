@@ -83,6 +83,17 @@ const FotoKamarController = {
             console.error('FotoKamar setPrimary error:', error);
             res.status(500).json({message: 'Internal Server Error'});
         }
+    },
+
+    insertFoto: async(req, res) => {
+
+        try {
+            const imagePath = '/uploads/${req.file.filename}';
+            FotoKamarModel.insertFoto({path: imagePath  });
+            return res.status(200).json({message: "gambar berhasil di upload"});
+        } catch (error) {
+            res.status(500).json({message: "Ada kesalahan dan di catch"});
+        }
     }
 
 };

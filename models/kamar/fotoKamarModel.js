@@ -26,7 +26,7 @@ const FotoKamarModel = {
 
         if (jadikanPrimary) {
             await db.query(
-                'UPDATE foto_kamar SET is_primary = 0 WHERE id_kamar =?',
+                'UPDATE foto_kamar SET is_primary = 0 WHERE id_kamar = ?',
                 [id_kamar]
             );               
         }
@@ -66,4 +66,17 @@ const FotoKamarModel = {
 
         return foto;
     },    
+
+    insertFoto: async(data) => {
+        const path = data;
+
+        const result = await db.query (
+            `INSERT INTO tes_foto (path) VALUES (?)`, [path]
+        );
+
+        return result;
+
+    },
 };
+
+module.exports = FotoKamarModel
