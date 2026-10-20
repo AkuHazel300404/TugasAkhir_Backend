@@ -141,3 +141,14 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# file uji coba 
+cookie*.txt 
+cookies*.txt
+login*.txt
+booking*.json
+
+# upload foto
+uploads/
+
+
