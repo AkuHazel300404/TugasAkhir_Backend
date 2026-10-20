@@ -1,29 +1,29 @@
 const db = require('../config/db');
-const { hashPasswword } = require('../utils/bcrypt');
+const { hashPassword } = require('../utils/bcrypt');
 
 const AdminModel = {
 
 
     //Get all
     getAll:async () => {
-        const [rows] = await db.query('SELECT * FROM admin');
+        const [rows] = await db.query('SELECT id, nama, email, status FROM admin');
         return rows;
     },
 
     getAllAktif: async () => {
-        const [rows] = await db.query ( 'SELECT * FROM admin WHERE status = 1');
-        return [rows];
+        const [rows] = await db.query ( 'SELECT id, nama, email, status FROM admin WHERE status = 1');
+        return rows;
     },
 
     //Get by id
     getById: async (id) => {
-        const [rows] = await db.query('SELECT * FROM admin WHERE id = ?', [id]);
+        const [rows] = await db.query('SELECT id, nama, email, status FROM admin WHERE id = ?', [id]);
         return rows[0];
     },
 
     //Get by id admin aktif
     getByIdAktif: async (id) => {
-        const [rows] = await db.query ( 'SELECT * FROM admin WHERE id = ? AND status = 1', [id] );
+        const [rows] = await db.query ( 'SELECT id, nama, email, status FROM admin WHERE id = ? AND status = 1', [id] );
         return rows[0];
     },
 

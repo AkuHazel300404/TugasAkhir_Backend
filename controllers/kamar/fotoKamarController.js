@@ -1,5 +1,6 @@
 const FotoKamarModel = require('../../models/kamar/fotoKamarModel');
 const KamarModel = require('../../models/kamar/kamarModel');
+const { removeFile } = require('../../auth/middlewares/uploadMiddleware');
 
 const FotoKamarController = {
 
@@ -85,16 +86,36 @@ const FotoKamarController = {
         }
     },
 
-    insertFoto: async(req, res) => {
-
+    insertFoto: async (req, res) => {
+        // Pada titik ini file sudah tersimpan di disk (req.file). Kalau ada langkah
+        // di bawah yang gagal, file harus dihapus supaya tidak menjadi file yatim.
         try {
-            const imagePath = '/uploads/${req.file.filename}';
-            FotoKamarModel.insertFoto({path: imagePath  });
-            return res.status(200).json({message: "gambar berhasil di upload"});
+            const id_kamar = Number(req.params.id_kamar);
+            if (!Number.isInteger(id_kamar) || id_kamar < 1) {
+                await removeFile(req.file.path);
+                return res.status(400).json({ success: false, message: 'ID kamar tidak valid' });
+            }
+
+            const kamar = await KamarModel.getById(id_kamar);
+            if (!kamar) {
+                await removeFile(req.file.path);
+                return res.status(404).json({ success: false, message: 'Kamar tidak ditemukan' });
+            }
+
+            const imagePath = `/uploads/${req.file.filename}`;
+            await FotoKamarModel.create({ id_kamar, path: imagePath });
+
+            return res.status(201).json({
+                success: true,
+                message: 'Foto berhasil diunggah',
+                data: { path: imagePath },
+            });
         } catch (error) {
-            res.status(500).json({message: "Ada kesalahan dan di catch"});
+            await removeFile(req.file?.path);
+            console.error('FotoKamar insertFoto error:', error);
+            return res.status(500).json({ success: false, message: 'Internal server error' });
         }
-    }
+    },
 
 };
 

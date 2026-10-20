@@ -191,7 +191,7 @@ const KamarModel = {
 
 
     update: async (id_kamar, data) => {
-        const connection = await db.getConnetction();
+        const connection = await db.getConnection();
         try{
 
             await connection.beginTransaction();
@@ -219,7 +219,7 @@ const KamarModel = {
                 
                 if (fasilitas && fasilitas.length > 0) {
                     const junctionValues = fasilitas.map(id_fasilitas => [id_kamar, id_fasilitas]);
-                    const queryJunction = `INSERT INTO kamar_fasilitas_kamar (id_kamar, id_fasilitas) WHERE VALUES ?`;
+                    const queryJunction = `INSERT INTO kamar_fasilitas_kamar (id_kamar, id_fasilitas) VALUES ?`;
 
                     await connection.query(queryJunction, [junctionValues]);
                 }

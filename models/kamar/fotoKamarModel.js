@@ -67,16 +67,16 @@ const FotoKamarModel = {
         return foto;
     },    
 
-    insertFoto: async(data) => {
-        const path = data;
+    // insertFoto: async(data) => {
+    //     const path = data;
 
-        const result = await db.query (
-            `INSERT INTO tes_foto (path) VALUES (?)`, [path]
-        );
+    //     const result = await db.query (
+    //         `INSERT INTO tes_foto (path) VALUES (?)`, [path]
+    //     );
 
-        return result;
+    //     return result;
 
-    },
+    // },
 };
 
 module.exports = FotoKamarModel

@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const AdminController = require('../controllers/adminController');
-const authMiddleware = require('../middlewares/authMiddleware');
+const { authenticate, authorize } = require('../auth/middlewares/authMiddleware');
 
-router.use(authMiddleware);
+router.use(authenticate, authorize('admin'));;
 
 router.get('/', AdminController.getAll);
 router.get('/aktif', AdminController.getAllAktif);

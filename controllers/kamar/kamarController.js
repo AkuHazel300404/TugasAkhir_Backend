@@ -34,7 +34,7 @@ const KamarController = {
             const result = await KamarModel.create(req.body);
             res.status(201).json({data: result, message: 'Kamar berhasil dibuat'});
         } catch ( error ){
-            res.status(500).json({message: 'Internal server error'});
+            res.status(500).json({message: 'Larinya Ke sini'});
         }
     },
 
@@ -45,7 +45,8 @@ const KamarController = {
             res.status(200).json({data: result, message: 'Room updated successfully'});
 
         } catch ( error ) {
-            res.status(500).json({message: 'Internal server error'});
+            console.error(error); // biar muncul di terminal Node
+            res.status(500).json({ message: error.message, stack: error.stack });
         }
     },
 
