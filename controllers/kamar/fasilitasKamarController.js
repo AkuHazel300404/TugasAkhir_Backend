@@ -1,5 +1,6 @@
 const FasilitasKamarModel = require ('../../models/kamar/fasilitasKamarModel');
 const KamarModel = require('../../models/kamar/kamarModel');
+const { handleError } = require('../../utils/httpError');
 
 const FasilitasKamarController = {
 

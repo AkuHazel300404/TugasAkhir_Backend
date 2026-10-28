@@ -1,4 +1,5 @@
 const UserModel = require('../models/userModel');
+const {handleError} = require('../utils/httpError');
 
 const UserController = {
     getAll: async (req, res) => {
@@ -11,7 +12,7 @@ const UserController = {
             return res.status(200).json({data: user, total: user.length});
         } catch (error) {
             console.error('Kamar getAll error:', error);
-            res.status(500).json({message: 'Dia Lari Ke Sini'});
+            return handleError(res, error, 'UserController getAll')
         }
     },
 
@@ -25,7 +26,7 @@ const UserController = {
             return res.status(200).json({data: user, total: user.length})
         } catch (error) {
             console.error('Kamar getAll error:', error);
-            res.status(500).json({message: 'Internal Server Error'});
+            return res.status(500).json({message: 'Internal Server Error'});
         }
     },
 
@@ -59,7 +60,7 @@ const UserController = {
             const result = await UserModel.update(id_user, req.body);
             return res.status(200).json({message: 'Data user berhasil diubah'});
         }catch(error){
-            res.status(500).json({message: 'Internal Server Error'});
+            return res.status(500).json({message: 'Internal Server Error'});
         }
     },
 
@@ -85,7 +86,7 @@ const UserController = {
             const result = await UserModel.blacklist(id_user);
             return res.status(200).json({message: 'User berhasil di blacklist'});
         }catch(error){
-            return res.status(500).json({message: error});
+            return handleError(res, error, 'UserController');
         }
     },
 
@@ -95,7 +96,7 @@ const UserController = {
             const result = await UserModel.whitelist(id_user);
             return res.status(200).json({message: 'User berhasil di whitelist'});
         }catch(error){
-            return res.status(500).json({message: error});
+            return handleError(res, error, 'UserController');
         }
     },
 
@@ -105,7 +106,7 @@ const UserController = {
             const result = await UserModel.delete(id_user);
             return res.status(200).json({message: 'Data user berhasil di hapus'});
         }catch(error){
-            return res.status(500).json({message: error});
+            return handleError(res, error, 'UserController');
         }
     },
 
@@ -115,7 +116,7 @@ const UserController = {
             const result = await UserModel.deactivate(id_user);
             return res.status(200).json({message: 'Data user berhasil di non-aktifkan'});
         }catch(error){
-            return res.status(500).json({message: error});
+            return handleError(res, error, 'UserController');
         }
     },
 };

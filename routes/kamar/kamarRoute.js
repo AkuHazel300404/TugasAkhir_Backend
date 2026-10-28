@@ -2,7 +2,7 @@ const KamarController = require('../../controllers/kamar/kamarController');
 const express = require('express');
 const router = express.Router();
 
-const { authenticate, authorize } = require('../../auth/middlewares/authMiddleware');
+const { authenticate, optionalAuth, authorize } = require('../../auth/middlewares/authMiddleware');
 const adminOnly = [authenticate, authorize('admin')];// router.get('/', KamarController.getAll);
 // router.get('/:id_kamar', KamarController.getById);
 // router.post('/', KamarController.create);
@@ -12,8 +12,11 @@ const adminOnly = [authenticate, authorize('admin')];// router.get('/', KamarCon
 // router.patch('/:id_kamar/deaktivasi', KamarController.deactivate);
 // router.delete('/:id_kamar', KamarController.delete);
 
-router.get('/kamar/', KamarController.getAll);               // publik (dipakai beranda)
-router.get('/kamar/:id_kamar', KamarController.getById);     // publik
+//publik
+router.get('/kamar/', optionalAuth, KamarController.getAll);
+router.get('/kamar/:id_kamar', optionalAuth, KamarController.getById);
+
+
 router.post('/kamar/', adminOnly, KamarController.create);
 router.put('/kamar/:id_kamar', adminOnly, KamarController.update);
 router.patch('/kamar/:id_kamar/status', adminOnly, KamarController.updateStatus);

@@ -1,4 +1,8 @@
 const db = require('../../config/db');
+const {AppError} = require('../../utils/httpError');
+const { withTransaction } = require('../../utils/transaction');
+
+const BOOKABLE_STATUS = ['empty'];
 
 const KamarModel = {
 
@@ -185,6 +189,8 @@ const KamarModel = {
             await connection.rollback();
             console.error('KamarModel create error:', error);
             throw error;
+        }finally{
+            connection.release();
         }
         
     },
@@ -237,20 +243,37 @@ const KamarModel = {
 
 
     updateStatus: async (id_kamar, status) => {
-        try{
-            const VALID_STATUS = ['available', 'reserved', 'occupied', 'empty', 'cleaning', 'maintenance'];
-            if (!VALID_STATUS.includes(status)) throw new Error('Status tidak valid: ${status}');
+        const VALID_STATUS = ['reserved', 'occupied', 'empty', 'cleaning', 'maintenance'];
+        if (!VALID_STATUS.includes(status)) throw new AppError(`Status tidak valid: ${status}`);
 
-            const result = await db.query(
-                `UPDATE kamar SET status = ?, updated_at = NOW() WHERE id_kamar = ?`,
+        return withTransaction(async (connection) => {
+            // Kunci baris kamar lebih dulu (urutan kunci sama dengan reservasiModel: kamar dulu)
+            const [[kamar]] = await connection.query(
+                'SELECT id_kamar FROM kamar WHERE id_kamar = ? FOR UPDATE', [id_kamar]
+            );
+            if (!kamar) throw new AppError('Kamar tidak ditemukan.', 404);
+
+            // Kamar yang punya reservasi disetujui tidak boleh ditandai kosong secara manual,
+            // karena statusnya akan bertentangan dengan reservasi yang masih berlaku.
+            if (BOOKABLE_STATUS.includes(status)) {
+                const [[disetujui]] = await connection.query(
+                    "SELECT id_reservasi FROM reservasi WHERE id_kamar = ? AND status = 'approved' LIMIT 1",
+                    [id_kamar]
+                );
+                if (disetujui) {
+                    throw new AppError(
+                        'Kamar ini masih memiliki reservasi yang disetujui. Batalkan reservasi tersebut terlebih dahulu.',
+                        409
+                    );
+                }
+            }
+
+            const [result] = await connection.query(
+                'UPDATE kamar SET status = ?, updated_at = NOW() WHERE id_kamar = ?',
                 [status, id_kamar]
             );
             return result;
-        }catch(error){
-            console.error('UpdateStatusKamar error: ', error);
-            throw error;
-        }
-        
+        });
     },
 
     activate: async (id_kamar) => {
@@ -265,13 +288,13 @@ const KamarModel = {
     deactivate: async (id_kamar) => {
         const [[kamar]] = await db.query('SELECT * FROM kamar WHERE id_kamar = ?', [id_kamar]);
         if (!kamar) {
-            throw new Error('Kamar Tidak Ditemukan');
+            throw new AppError('Kamar Tidak Ditemukan', 404);
         }
 
         const BLOCKED_STATUS = ['reserved', 'occupied'];
 
         if(BLOCKED_STATUS.includes(kamar.status)) {
-            throw new Error(`Kamar Tidak Dapat Dinonaktifkan dengan Status "${kamar.status}"`);
+            throw new AppError(`Kamar Tidak Dapat Dinonaktifkan dengan Status "${kamar.status}"`);
         }
 
         const result = await db.query(
@@ -281,21 +304,35 @@ const KamarModel = {
         return result;
     },
     
-    delete: async (id_kamar) => {
-        const [[kamar]] = await db.query('SELECT * FROM kamar WHERE id_kamar = ?',
-            [id_kamar]
+    delete: async (id_kamar) => withTransaction(async (connection) => {
+        const [[kamar]] = await connection.query(
+            'SELECT id_kamar, status FROM kamar WHERE id_kamar = ? FOR UPDATE', [id_kamar]
         );
-
-        if (!kamar) {
-            throw new Error('Kamar Tidak Ditemukan');
-        }
+        if (!kamar) throw new AppError('Kamar tidak ditemukan.', 404);
 
         const BLOCKED_STATUS = ['reserved', 'occupied', 'maintenance', 'cleaning'];
-
-        if(BLOCKED_STATUS.includes(kamar.status)){
-            throw new Error(`Kamar Tidak Dapat Dihapus dengan Status "${kamar.status}"`);
+        if (BLOCKED_STATUS.includes(kamar.status)) {
+            throw new AppError(`Kamar tidak dapat dihapus dengan status "${kamar.status}"`, 409);
         }
-    }
+
+        // Kamar yang pernah punya reservasi tidak dihapus supaya riwayatnya tetap utuh.
+        const [[riwayat]] = await connection.query(
+            'SELECT id_reservasi FROM reservasi WHERE id_kamar = ? LIMIT 1', [id_kamar]
+        );
+        if (riwayat) {
+            throw new AppError('Kamar ini memiliki riwayat reservasi dan tidak dapat dihapus. Nonaktifkan kamar sebagai gantinya.', 409);
+        }
+
+        const [foto] = await connection.query('SELECT path FROM foto_kamar WHERE id_kamar = ?', [id_kamar]);
+
+        // Hapus data turunan dulu, baru kamarnya
+        await connection.query('DELETE FROM kamar_fasilitas_kamar WHERE id_kamar = ?', [id_kamar]);
+        await connection.query('DELETE FROM foto_kamar WHERE id_kamar = ?', [id_kamar]);
+        const [result] = await connection.query('DELETE FROM kamar WHERE id_kamar = ?', [id_kamar]);
+
+        // path foto dikembalikan agar file di disk bisa dibersihkan oleh controller
+        return { affectedRows: result.affectedRows, foto: foto.map((f) => f.path) };
+    }),
 };
 
 module.exports = KamarModel;

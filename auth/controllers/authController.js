@@ -68,13 +68,17 @@ const AuthController = {
                 return res.status(401).json({ success: false, message: 'Invalid email or password'});
             }
 
+            if(Number(admin.status) !== 1) {
+                return res.status(403).json({success: false, message: 'Akun anda tidak aktif.'})
+            }
+
             // const token = jwt.sign(
             //     { id: admin.id, email: admin.email },
             //     process.env.JWT_SECRET,
             //     { expiresIn: process.env.JWT_EXPIRES_IN}
             // );
 
-            const token = generateAccessToken({ id: admin.id, email: admin.email, role: 'admin' });
+            const token = generateAccessToken({ id: admin.id, email: admin.email, role: 'admin', tv: admin.token_version });
             setAuthCookie(res, token);
 
             res.json ({ 
@@ -115,11 +119,11 @@ const AuthController = {
                 return res.status(403).json({success: false, message: 'Akun Anda tidak dapat digunakan.'});
             }
 
-            // if(user.is_active === 0) {
-            //     return res.status(403).json({success: false, message: 'Akun kamu tidak aktif.'});
-            // }
+            if(user.is_active === 0) {
+                return res.status(403).json({success: false, message: 'Akun kamu tidak aktif.'});
+            }
 
-            const token = generateAccessToken({ id: user.id_user, email: user.email, role: 'user' });
+            const token = generateAccessToken({ id: user.id_user, email: user.email, role: 'user', tv: user.token_version });
             setAuthCookie(res, token);
 
             res.json ({
@@ -217,7 +221,7 @@ const AuthController = {
         }
     },
 
-        changePasswordUser: async (req, res) => {
+    changePasswordUser: async (req, res) => {
         try {
             const { password_lama, password_baru } = req.body;
 
@@ -250,6 +254,11 @@ const AuthController = {
             }
 
             await UserModel.updatePassword(req.user.id, password_baru);
+
+            const state = await UserModel.getAuthState(req.user.id);
+            const token = generateAccessToken({id:req.user.id, email: req.user.email, role: 'user', tv: state.token_version});
+            setAuthCookie(res, token);
+
             return res.json({ success: true, message: 'Password berhasil diubah' });
         } catch (error) {
             console.error('changePasswordUser error:', error);

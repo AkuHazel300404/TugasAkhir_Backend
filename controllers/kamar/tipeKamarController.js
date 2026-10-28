@@ -1,4 +1,5 @@
 const TipeKamarModel = require('../../models/kamar/tipeKamarModel');
+const { handleError } = require('../../utils/httpError');
 
 const TipeKamarController = {
 

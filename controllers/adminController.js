@@ -1,4 +1,5 @@
 const AdminModel = require('../models/adminModel');
+const { handleError } = require('../utils/httpError');
 
 const AdminController = {
 
@@ -8,7 +9,7 @@ const AdminController = {
             const admin = await AdminModel.getAll();
             res.json({success: true, data: admin});
         } catch (error) {
-            res.status(500).json({success: false, message: error.message});
+            return handleError(res, error, 'AdminController');
         }
     },
 
@@ -17,7 +18,7 @@ const AdminController = {
             const admin = await AdminModel.getAllAktif();
             res.json({success: true, data: admin});
         } catch  (error) {
-            res.status(500).json({success: false, message: error.message});
+            return handleError(res, error, 'AdminController');
         }
     },
 
@@ -29,7 +30,7 @@ const AdminController = {
             }
             res.json({success:true, data:admin});
         } catch (error) {
-            res.status(500).json({success: false, message: error.message});
+            return handleError(res, error, 'AdminController');
         }
     },
 
@@ -41,7 +42,7 @@ const AdminController = {
             }
             res.json({success: true, data: admin});
         } catch ( error ) {
-            res.status(500).json({success: false, message: error.message});
+            return handleError(res, error, 'AdminController');
         }
         
     },
@@ -51,7 +52,7 @@ const AdminController = {
             const result = await AdminModel.create(req.body);
             res.json({ success: true, message: 'Admin created successfully'});
         } catch (error) {
-            res.status(500).json({success: false, message: error.message});
+            return handleError(res, error, 'AdminController');
         }
     },
 
@@ -64,16 +65,16 @@ const AdminController = {
             await AdminModel.getById(req.params.id);
             res.json({success: true, message: 'Admin updated successfully'});
         } catch (error) {
-            res.status(500).json({success: false, message: error.message});
+            return handleError(res, error, 'AdminController');
         }
     },
 
     deaktivasi: async (req, res) => {
         try{
-            await AdminModel.deaktivasiAdmin(req.params.id);
-            res.json({success: true, message: 'Admin deactivated successfully'});
+            await AdminModel.deaktivasiAdmin(req.params.id, req.user.id);
+            res.json({success: true, message: 'Admin berhasil dinonaktifkan'});
         } catch (error) {
-            res.status(500).json({success: false, message: error.message});
+            return handleError(res, error, 'AdminController');
         }
     },
 
@@ -82,7 +83,7 @@ const AdminController = {
             await AdminModel.aktivasiAdmin(req.params.id);
             res.json({success: true, message: 'Admin activated successfully'});
         } catch (error) {
-            res.status(500).json({success:false, message: error.message});
+            return handleError(res, error, 'AdminController');
         }
         
     }

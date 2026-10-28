@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const { hashPassword } = require('../utils/bcrypt');
+const {AppError} = require('../utils/httpError');
 
 const PROFILE_FIELDS = [
     'nama', 'jenis_kelamin', 'tanggal_lahir', 'nomor_hp', 'alamat',
@@ -108,10 +109,18 @@ const UserModel = {
         return row?.password || null;
     },
 
+    getAuthState: async (id_user) => {
+        const [[row]] = await db.query(
+            'SELECT id_user, is_active, is_blacklist, token_version FROM user WHERE id_user = ?',
+            [id_user]
+        );
+        return row || null;
+    },
+
     updatePassword: async (id_user, newPassword) => {
         const hashed = await hashPassword(newPassword);
         const [result] = await db.query(
-            'UPDATE user SET password = ? WHERE id_user = ?', [hashed, id_user]
+            'UPDATE user SET password = ?, token_version = token_version + 1 WHERE id_user = ?', [hashed, id_user]
         );
         return result;
     },
@@ -196,8 +205,8 @@ const UserModel = {
             'SELECT is_blacklist FROM user WHERE id_user = ?', [id_user]
         );
 
-        if (!user) throw new Error('User tidak ditemukan.');
-        if (user.is_blacklist) throw new Error('User sudah ada di blacklist.');
+        if (!user) throw new AppError('User tidak ditemukan.', 404);
+        if (user.is_blacklist) throw new AppError('User sudah ada di blacklist.');
 
         const [result] = await db.query(
             'UPDATE user SET is_blacklist = 1 WHERE id_user = ?', [id_user]
@@ -210,8 +219,8 @@ const UserModel = {
             'SELECT is_blacklist FROM user WHERE id_user = ?', [id_user]
         );
 
-        if (!user) throw new Error('User tidak ditemukan.');
-        if (!user.is_blacklist) throw new Error('User tidak ada di blacklist.');
+        if (!user) throw new AppError('User tidak ditemukan.', 404);
+        if (!user.is_blacklist) throw new AppError('User tidak ada di blacklist.');
 
         const [result] = await db.query(
             'UPDATE user SET is_blacklist = 0 WHERE id_user = ?', [id_user]
@@ -224,7 +233,7 @@ const UserModel = {
             'SELECT id_user FROM user WHERE id_user = ?', [id_user]
         );
 
-        if (!user) throw new Error('User tidak ditemukan.');
+        if (!user) throw new AppError('User tidak ditemukan.', 404);
 
         const [result] = await db.query(
             'DELETE FROM user WHERE id_user = ?', [id_user]
@@ -237,7 +246,7 @@ const UserModel = {
             'SELECT id_user FROM user WHERE id_user = ?', [id_user]
         );
 
-        if (!user) throw new Error('User tidak ditemukan.');
+        if (!user) throw new AppError('User tidak ditemukan.', 404);
 
         const [result] = await db.query(
             'UPDATE user SET is_active = 0 WHERE id_user = ?', [id_user]

@@ -96,6 +96,17 @@ const ReservasiController = {
         }
     },
 
+    cancelByAdmin: async (req, res) => {
+        const id = parseId(req, res);
+        if (id === null) return;
+        try {
+            const result = await ReservasiModel.cancelApproved(id);
+            res.status(200).json({ success: true, data: result, message: 'Reservasi dibatalkan oleh admin' });
+        } catch (error) {
+            handleError(res, error, 'Reservasi cancelByAdmin');
+        }
+    },
+
     cancel: async (req, res) => {
         const id = parseId(req, res);
         if (id === null) return;

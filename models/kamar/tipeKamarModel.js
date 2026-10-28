@@ -1,4 +1,5 @@
 const db = require('../../config/db');
+const {AppError} = require('../../utils/httpError');
 
 const TipeKamarModel = {
 
@@ -35,7 +36,7 @@ const TipeKamarModel = {
             'SELECT COUNT(*) AS total FROM kamar WHERE id_tipe_kamar = ?', [id_tipe_kamar]
         );
         if (total > 0) {
-            throw new Error('Tipe kamar masih digunakan oleh kamar aktif.');
+            throw new AppError('Tipe kamar masih digunakan oleh kamar aktif.');
         }
         const [result] = await db.query(
             'DELETE FROM tipe_kamar WHERE id_tipe_kamar = ?',

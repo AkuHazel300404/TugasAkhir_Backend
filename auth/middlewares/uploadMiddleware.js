@@ -94,4 +94,4 @@ const uploadImage = (fieldName) => (req, res, next) => {
     });
 };
 
-module.exports = { uploadImage, removeFile };
+module.exports = { uploadImage, removeFile, UPLOAD_DIR };

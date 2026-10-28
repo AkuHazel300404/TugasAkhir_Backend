@@ -1,4 +1,5 @@
 const db = require('../../config/db');
+const {AppError} = require('../../utils/httpError');
 
 const FasilitasKamarModel = {
 

@@ -1,4 +1,5 @@
 const db = require('../../config/db');
+const {AppError} = require('../../utils/httpError');
 
 class BookingError extends Error {
     constructor(message, status = 400) {
@@ -164,6 +165,38 @@ const ReservasiModel = {
             "UPDATE reservasi SET status = 'rejected' WHERE id_reservasi = ?", [id_reservasi]
         );
         return { id_reservasi, status: 'rejected' };
+    }),
+
+    cancelApproved: (id_reservasi) => inTransaction(async (connection) => {
+        // Urutan kunci sama dengan approve(): kamar dulu, baru reservasi (cegah deadlock)
+        const [[awal]] = await connection.query(
+            'SELECT id_kamar FROM reservasi WHERE id_reservasi = ?', [id_reservasi]
+        );
+        if (!awal) throw new BookingError('Reservasi tidak ditemukan', 404);
+
+        const [[kamar]] = await connection.query(
+            'SELECT id_kamar, status FROM kamar WHERE id_kamar = ? FOR UPDATE', [awal.id_kamar]
+        );
+
+        const reservasi = await lockReservasi(connection, id_reservasi);
+        if (reservasi.status !== 'approved') {
+            throw new BookingError(`Reservasi berstatus "${reservasi.status}" tidak dapat dibatalkan oleh admin`, 409);
+        }
+
+        await connection.query(
+            "UPDATE reservasi SET status = 'cancelled' WHERE id_reservasi = ?", [id_reservasi]
+        );
+
+        // Kamar hanya dikosongkan jika masih 'reserved'. Kalau admin sudah mengubahnya
+        // (mis. occupied/maintenance), statusnya dibiarkan.
+        const kamarDikosongkan = Boolean(kamar && kamar.status === 'reserved');
+        if (kamarDikosongkan) {
+            await connection.query(
+                "UPDATE kamar SET status = 'empty', updated_at = NOW() WHERE id_kamar = ?", [kamar.id_kamar]
+            );
+        }
+
+        return { id_reservasi, status: 'cancelled', kamar_dikosongkan: kamarDikosongkan };
     }),
 
     // Pelanggan hanya boleh membatalkan reservasinya sendiri yang masih pending

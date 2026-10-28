@@ -5,6 +5,8 @@ const cookieParser = require("cookie-parser");
 
 require('dotenv').config();
 
+const {AppError} = require('./utils/httpError');
+
 const authRoutes = require('./auth/routes/authRoute');
 
 const adminRoutes = require('./routes/adminRoute');
@@ -21,6 +23,9 @@ const fotoRoutes = require('./routes/kamar/fotoKamarRoute');
 const reservasiRoutes = require('./routes/reservasi/reservasiRoute');
 
 const app = express();
+
+
+app.disable('x-powered-by'); // Disable the 'X-Powered-By' header for security reasons
 
 app.use(
     cors({
@@ -66,6 +71,27 @@ app.get("/api/data", (req, res) => {
     res.json({ message: "hello from the API!"});
 });
 
+app.use((req, res) => {
+    res.status(404).json({success: false, message: 'Endpoint tidak ditemukan'});
+});
+
+app.use((err, req, res, next) => {
+    if(res.headersSent) return next(err);
+    
+    if(err.type === 'entity.parse.failed') {
+        return res.status(400).json({success:false, message: 'Format JSON tidak valid'});
+    }
+    if(err.type === 'entity.too.large') {
+        return res.status(413).json({success: false, message: 'Data yang dikirm terlalu besar'});
+    }
+    if(err instanceof AppError) {
+        return res.status(err.status).json({success: false, message: err.message});
+    }
+
+    console.error('Unhandled error:', err);
+    return res.status(500).json({success: false, message: 'Terjadi kesalahan pada server'});
+});
+
 app.listen(process.env.PORT, () => {
     console.log(`Server is running on http://localhost:${process.env.PORT}`);
-})
+});

@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const {AppError} = require('../utils/httpError');
 
 const CustomerModel = {
 
@@ -122,8 +123,8 @@ const CustomerModel = {
             'SELECT is_blacklist FROM customer WHERE id_customer = ?', [id_customer]
         );
 
-        if (!customer) throw new Error('Customer tidak ditemukan.');
-        if (customer.is_blacklist) throw new Error('Customer sudah ada di blacklist.');
+        if (!customer) throw new AppError('Customer tidak ditemukan.', 404);
+        if (customer.is_blacklist) throw new AppError('Customer sudah ada di blacklist.');
 
         const [result] = await db.query(
             'UPDATE customer SET is_blacklist = 1 WHERE id_customer = ?', [id_customer]
@@ -136,8 +137,8 @@ const CustomerModel = {
             'SELECT is_blacklist FROM customer WHERE id_customer = ?', [id_customer]
         );
 
-        if (!customer) throw new Error('Customer tidak ditemukan.');
-        if (!customer.is_blacklist) throw new Error('Customer tidak ada di blacklist.');
+        if (!customer) throw new AppError('Customer tidak ditemukan.', 404);
+        if (!customer.is_blacklist) throw new AppError('Customer tidak ada di blacklist.');
 
         const [result] = await db.query(
             'UPDATE customer SET is_blacklist = 0 WHERE id_customer = ?', [id_customer]
@@ -150,7 +151,7 @@ const CustomerModel = {
             'SELECT id_customer FROM customer WHERE id_customer = ?', [id_customer]
         );
 
-        if (!customer) throw new Error('Customer tidak ditemukan.');
+        if (!customer) throw new AppError('Customer tidak ditemukan.', 404);
 
         const [result] = await db.query(
             'DELETE FROM customer WHERE id_customer = ?', [id_customer]
@@ -163,7 +164,7 @@ const CustomerModel = {
             'SELECT id_customer FROM customer WHERE id_customer = ?', [id_customer]
         );
 
-        if (!customer) throw new Error('Customer tidak ditemukan.');
+        if (!customer) throw new AppError('Customer tidak ditemukan.', 404);
 
         const [result] = await db.query(
             'UPDATE customer SET is_active = 0 WHERE id_customer = ?', [id_customer]

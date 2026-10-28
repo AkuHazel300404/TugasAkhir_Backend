@@ -1,6 +1,7 @@
 const FotoKamarModel = require('../../models/kamar/fotoKamarModel');
 const KamarModel = require('../../models/kamar/kamarModel');
 const { removeFile } = require('../../auth/middlewares/uploadMiddleware');
+const { handleError } = require('../../utils/httpError');
 
 const FotoKamarController = {
 
@@ -12,7 +13,7 @@ const FotoKamarController = {
                 return res.status(404).json({message: 'Kamar Tidak Ditemukan'});
             }
 
-            const fotoKamar = await FotoKamarModel.getByKamar(id);
+            const fotoKamar = await FotoKamarModel.getByKamar(id_kamar);
             res.status(200).json({
                 data: fotoKamar,
                 total: fotoKamar.length

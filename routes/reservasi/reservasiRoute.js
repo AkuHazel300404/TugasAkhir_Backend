@@ -8,6 +8,7 @@ router.post('/reservasi', authenticate, authorize('user'), ReservasiController.c
 router.get('/reservasi', authenticate, authorize('admin'), ReservasiController.getAll);
 router.patch('/reservasi/:id_reservasi/setujui', authenticate, authorize('admin'), ReservasiController.approve);
 router.patch('/reservasi/:id_reservasi/tolak', authenticate, authorize('admin'), ReservasiController.reject);
+router.patch('/reservasi/:id_reservasi/batalkan', authenticate, authorize('admin'), ReservasiController.cancelByAdmin);
 router.patch('/reservasi/:id_reservasi/batal', authenticate, authorize('user'), ReservasiController.cancel);
 
 module.exports = router;

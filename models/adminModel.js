@@ -1,5 +1,7 @@
 const db = require('../config/db');
 const { hashPassword } = require('../utils/bcrypt');
+const {AppError} = require('../utils/httpError');
+const {withTransaction} = require('../utils/transaction');
 
 const AdminModel = {
 
@@ -32,6 +34,13 @@ const AdminModel = {
         return rows [0];
     },
 
+    getAuthState: async (id) => {
+        const [rows] = await db.query(
+            'SELECT id, status, token_version FROM admin WHERE id = ?', [id]
+        );
+        return rows[0] || null;
+    },
+
     //Create
     create: async (data) => {
         const { nama, email, password } = data;
@@ -52,10 +61,27 @@ const AdminModel = {
     },
 
     //Deaktif admin (delete logic)
-    deaktivasiAdmin: async (id) => {
-        const result = await db.query('UPDATE admin SET status = 0 WHERE id = ?', [id]);
+    deaktivasiAdmin: async (id, actorId) => withTransaction(async (connection) => {
+        id = Number(id);
+        actorId = Number(actorId);
+
+        if (id === actorId) throw new AppError('Anda tidak dapat menonaktifkan akun Anda sendiri.', 403);
+
+        // Kunci kedua baris (urut id, mencegah deadlock) supaya dua admin yang saling
+        // menonaktifkan secara bersamaan tidak bisa membuat jumlah admin aktif menjadi nol.
+        const [rows] = await connection.query(
+            'SELECT id, status FROM admin WHERE id IN (?, ?) ORDER BY id FOR UPDATE', [id, actorId]
+        );
+        const target = rows.find((r) => r.id === id);
+        const actor = rows.find((r) => r.id === actorId);
+
+        if (!target) throw new AppError('Admin tidak ditemukan.', 404);
+        if (!actor || Number(actor.status) !== 1) throw new AppError('Akun Anda tidak aktif.', 403);
+        if (Number(target.status) !== 1) throw new AppError('Admin tersebut sudah nonaktif.', 409);
+
+        const [result] = await connection.query('UPDATE admin SET status = 0 WHERE id = ?', [id]);
         return result;
-    },
+    }),
 
     //Aktivasi admin 
     aktivasiAdmin: async (id) => {
